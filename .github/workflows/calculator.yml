@@ -1,0 +1,50 @@
+name: calculator
+
+# Builds the browser calculator (app/calculator.py) and publishes it to GitHub Pages.
+# Skipped while the repository is private.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install tools
+        run: pip install build "marimo==0.25.2" uv
+      - name: Build the library wheel for the page
+        run: python -m build --wheel --outdir app/public .
+      - name: Export the calculator
+        run: |
+          pip install -e .
+          marimo export html-wasm app/calculator.py -o site --mode run
+          find site -maxdepth 1 -name "*.md" -delete
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

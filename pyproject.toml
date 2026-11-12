@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evalsize"
+version = "0.1.0"
+description = "How many eval examples do I need? Sample size and power planning for LLM evals"
+readme = "README.md"
+license = "MIT"
+authors = [{name = "Meenal Asesh"}]
+requires-python = ">=3.9"
+dependencies = []
+keywords = ["llm", "evaluation", "evals", "sample size", "power analysis", "statistics", "llm-as-a-judge", "a/b testing"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+evalsize = "evalsize.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/ai-with-md/evalsize"
+Calculator = "https://ai-with-md.github.io/evalsize/"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "src"]
+addopts = "--doctest-modules"
