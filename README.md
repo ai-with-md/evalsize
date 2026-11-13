@@ -33,7 +33,7 @@ When both models answer the same questions, only the questions where they **disa
 **In Python:**
 
 ```bash
-pip install git+https://github.com/ai-with-md/evalsize
+pip install evalsize
 ```
 
 No dependencies beyond the standard library. Python 3.9 or newer.
@@ -119,7 +119,7 @@ evalsize judge   --judge-rate 0.82 --sensitivity 0.95 --specificity 0.7 --human-
 
 ## How the numbers are checked
 
-Formulas are easy to get subtly wrong, so every one is tested against simulation. The test suite runs thousands of fake evals with known true pass rates and checks that the promises hold: the sample sizes deliver their stated power, the intervals cover the truth 95% of the time, the false alarm rate stays at 5%, and the rerun and judge corrections match what the simulations show. See [`tests/test_simulation.py`](tests/test_simulation.py).
+Formulas are easy to get subtly wrong, so every one is tested against simulation. The test suite runs thousands of fake evals with known true pass rates and checks that the promises hold: the sample sizes deliver their stated power, the intervals cover the truth 95% of the time, the false alarm rate stays at 5%, and the rerun and judge corrections match what the simulations show. See [`tests/test_simulation.py`](https://github.com/ai-with-md/evalsize/blob/main/tests/test_simulation.py).
 
 ## How it compares
 
@@ -147,7 +147,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-The calculator is a [marimo](https://marimo.io) notebook in [`app/calculator.py`](app/calculator.py). To run it locally: `pip install marimo matplotlib`, then `marimo run app/calculator.py`. It is published to GitHub Pages as a WebAssembly app on every push to `main`.
+The calculator is a [marimo](https://marimo.io) notebook in [`app/calculator.py`](https://github.com/ai-with-md/evalsize/blob/main/app/calculator.py). To run it locally: `pip install marimo matplotlib`, then `marimo run app/calculator.py`. It is published to GitHub Pages as a WebAssembly app on every push to `main`.
 
 ## License
 
