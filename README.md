@@ -16,6 +16,7 @@ Most teams pick an eval size by feel: 100 questions, maybe 500. Then a new promp
 3. Is the difference I measured real, or noise?
 4. Should I add more questions, or run each question several times?
 5. My LLM judge makes mistakes. How much does that move the score, and how many answers should I label by hand?
+6. I'm testing five prompts at once. How do I avoid picking a lucky winner?
 
 ## The number most people get wrong
 
@@ -109,6 +110,34 @@ es.labels_to_check_judge(margin=0.05, pass_rate=0.80)
 # how many answers to label by hand before you start
 ```
 
+### 6. Testing several prompts at once?
+
+Test four new prompts that are all exactly as good as the current one, and there is up to a 19% chance that one of them looks significantly better by luck. Pick it and you ship a change that does nothing. evalsize shares the 5% false alarm rate across all the comparisons, and flags the candidates that only looked good because you tried several.
+
+```python
+es.examples_to_compare(baseline=0.70, improvement=0.05, disagreement=0.15, comparisons=4)
+# 667 questions to test 4 new prompts, instead of 469 for one
+
+result = es.compare_many(
+    {"current": current, "short": short, "step_by_step": step, "persona": persona, "few_shot": few_shot},
+    baseline="current",
+)
+print(result)
+# 4 candidates against 'current' (68.7%) on 300 shared questions, corrected for 4 comparisons.
+#   short         vs current   +0.0%  (-3.8% to +3.8%)  adjusted p = 1  could be noise
+#   step_by_step  vs current   +7.7%  (+3.7% to +11.5%)  adjusted p = 9.54e-07  reliably better
+#   persona       vs current   +3.3%  (-0.1% to +6.7%)  adjusted p = 0.0638  could be noise
+#   few_shot      vs current   -0.7%  (-4.3% to +2.9%)  adjusted p = 1  could be noise
+# Reliably better than 'current': step_by_step.
+# Without the correction, persona would have looked significant at 0.05. Treat it as a possible lucky win.
+```
+
+Leave out `baseline` to compare every pair. Or from a CSV with one column per prompt and one row per question (try [`examples/four_prompts.csv`](https://github.com/ai-with-md/evalsize/blob/main/examples/four_prompts.csv), simulated results where only `step_by_step` is really better):
+
+```bash
+evalsize many results.csv --baseline current
+```
+
 ## Command line
 
 ```bash
@@ -118,11 +147,13 @@ evalsize margin  --rate 0.8 --margin 0.03
 evalsize diff    --n 300 --only-a 12 --only-b 28
 evalsize reruns  --n 200 --share 0.6
 evalsize judge   --judge-rate 0.82 --sensitivity 0.95 --specificity 0.7 --human-passes 140 --human-fails 60
+evalsize compare --baseline 0.7 --improvement 0.05 --disagreement 0.15 --comparisons 4
+evalsize many    results.csv --baseline current
 ```
 
 ## How the numbers are checked
 
-Formulas are easy to get subtly wrong, so every one is tested against simulation. The test suite runs thousands of fake evals with known true pass rates and checks that the promises hold: the sample sizes deliver their stated power, the intervals cover the truth 95% of the time, the false alarm rate stays at 5%, and the rerun and judge corrections match what the simulations show. See [`tests/test_simulation.py`](https://github.com/ai-with-md/evalsize/blob/main/tests/test_simulation.py).
+Formulas are easy to get subtly wrong, so every one is tested against simulation. The test suite runs thousands of fake evals with known true pass rates and checks that the promises hold: the sample sizes deliver their stated power, the intervals cover the truth 95% of the time, the false alarm rate stays at 5% (also when testing several prompts at once), and the rerun and judge corrections match what the simulations show. See [`tests/test_simulation.py`](https://github.com/ai-with-md/evalsize/blob/main/tests/test_simulation.py).
 
 ## How it compares
 
@@ -138,6 +169,7 @@ Formulas are easy to get subtly wrong, so every one is tested against simulation
 | Comparing two models, analysis | Exact McNemar test, Agresti and Min (2005) interval for the paired difference |
 | Reruns | Intraclass correlation (one-way analysis of variance estimator) and the design effect |
 | Imperfect judges | Rogan and Gladen (1978) estimator with a delta method interval that includes the uncertainty in the judge's measured error rates |
+| Several prompts at once | Bonferroni split of the false alarm rate for planning; Holm adjusted p-values and Bonferroni adjusted intervals for analysis |
 
 Everything here is for pass/fail scores, which is how most evals are reported. Planning for scores on a scale (1 to 5, or 0 to 1) is a likely next step.
 

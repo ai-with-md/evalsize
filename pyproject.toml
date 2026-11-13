@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evalsize"
-version = "0.1.0"
+version = "0.2.0"
 description = "How many eval examples do I need? Sample size and power planning for LLM evals"
 readme = "README.md"
 license = "MIT"

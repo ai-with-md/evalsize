@@ -1,17 +1,20 @@
-"""Command line: ``evalsize compare``, ``evalsize margin``, ``evalsize detect`` and more."""
+"""Command line: ``evalsize compare``, ``evalsize many``, ``evalsize detect`` and more."""
 
 from __future__ import annotations
 
 import argparse
+import csv
 import sys
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from . import (
     compare_counts,
+    compare_many,
     correct_judge_rate,
     effective_examples,
     examples_for_margin,
     examples_to_compare,
+    false_win_chance,
     labels_to_check_judge,
     smallest_detectable_improvement,
 )
@@ -31,13 +34,23 @@ def _cmd_margin(args: argparse.Namespace) -> str:
 
 def _cmd_compare(args: argparse.Namespace) -> str:
     paired = not args.unpaired
-    n = examples_to_compare(args.baseline, args.improvement, paired, args.disagreement, args.alpha, args.power)
+    n = examples_to_compare(
+        args.baseline, args.improvement, paired, args.disagreement, args.alpha, args.power, args.comparisons
+    )
     target = args.baseline + args.improvement
     lines = [
         f"To detect {_pct(args.baseline)} -> {_pct(target)} with {args.power:.0%} power "
-        f"(false alarm rate {args.alpha:g}):",
+        f"(false alarm rate {args.alpha:g}"
+        + (f" across {args.comparisons} comparisons" if args.comparisons > 1 else "")
+        + "):",
         f"  {n} questions" + (" per model" if not paired else ", both models on the same questions"),
     ]
+    if args.comparisons > 1:
+        single = examples_to_compare(args.baseline, args.improvement, paired, args.disagreement, args.alpha, args.power)
+        lines.append(
+            f"  ({single} would be enough for a single comparison. Testing {args.comparisons} candidates without\n"
+            f"  correcting gives up to a {false_win_chance(args.comparisons, args.alpha):.0%} chance of a lucky winner.)"
+        )
     if paired and args.disagreement is None:
         lines.append(
             "  This assumes the models make mistakes independently. Most model pairs agree more,\n"
@@ -48,7 +61,7 @@ def _cmd_compare(args: argparse.Namespace) -> str:
 
 def _cmd_detect(args: argparse.Namespace) -> str:
     gain = smallest_detectable_improvement(
-        args.n, args.baseline, not args.unpaired, args.disagreement, args.alpha, args.power
+        args.n, args.baseline, not args.unpaired, args.disagreement, args.alpha, args.power, args.comparisons
     )
     if gain is None:
         return f"With {args.n} questions no improvement over {_pct(args.baseline)} can be reliably detected."
@@ -60,6 +73,38 @@ def _cmd_detect(args: argparse.Namespace) -> str:
 
 def _cmd_diff(args: argparse.Namespace) -> str:
     return compare_counts(args.n, args.only_a, args.only_b, args.confidence).summary()
+
+
+_TRUE = {"1", "true", "t", "yes", "y", "pass", "passed"}
+_FALSE = {"0", "false", "f", "no", "n", "fail", "failed"}
+
+
+def read_results_csv(path: str) -> Dict[str, List[bool]]:
+    """Read a CSV with one column per candidate and one row per question.
+
+    Cells may be 1/0, true/false, yes/no or pass/fail. A column named
+    ``question`` or ``id`` is ignored.
+    """
+    with open(path, newline="", encoding="utf-8-sig") as handle:
+        reader = csv.DictReader(handle)
+        if not reader.fieldnames:
+            raise ValueError(f"{path} has no header row")
+        names = [c for c in reader.fieldnames if c and c.strip().lower() not in {"question", "id", "question_id"}]
+        data: Dict[str, List[bool]] = {name: [] for name in names}
+        for line, row in enumerate(reader, start=2):
+            for name in names:
+                cell = (row.get(name) or "").strip().lower()
+                if cell in _TRUE:
+                    data[name].append(True)
+                elif cell in _FALSE:
+                    data[name].append(False)
+                else:
+                    raise ValueError(f"{path}, line {line}, column {name!r}: cannot read {row.get(name)!r} as pass or fail")
+    return data
+
+
+def _cmd_many(args: argparse.Namespace) -> str:
+    return compare_many(read_results_csv(args.file), args.baseline, args.confidence).summary()
 
 
 def _cmd_reruns(args: argparse.Namespace) -> str:
@@ -101,6 +146,10 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("--unpaired", action="store_true", help="the two models answer different questions")
         p.add_argument("--alpha", type=float, default=0.05)
         p.add_argument("--power", type=float, default=0.8)
+        p.add_argument(
+            "--comparisons", type=int, default=1,
+            help="number of comparisons in the eval, e.g. 4 when testing 4 new prompts against the current one",
+        )
 
     p = sub.add_parser("compare", help="questions needed to detect that B beats A")
     comparison_options(p)
@@ -118,6 +167,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--only-b", type=int, required=True, help="questions only B got right")
     p.add_argument("--confidence", type=float, default=0.95)
     p.set_defaults(run=_cmd_diff)
+
+    p = sub.add_parser("many", help="compare several prompts or models from a CSV of results")
+    p.add_argument("file", help="CSV with one column per candidate and one row per question (1/0 or pass/fail)")
+    p.add_argument("--baseline", help="column name of the current prompt or model; leave out to compare every pair")
+    p.add_argument("--confidence", type=float, default=0.95)
+    p.set_defaults(run=_cmd_many)
 
     p = sub.add_parser("reruns", help="what running each question several times is worth")
     p.add_argument("--n", type=int, required=True, help="number of questions")

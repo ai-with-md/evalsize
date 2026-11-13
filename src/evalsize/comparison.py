@@ -61,6 +61,14 @@ def _setup(baseline: float, improvement: float, disagreement: Optional[float]):
     return target, disagreement
 
 
+def _split_alpha(alpha: float, comparisons: int) -> float:
+    """Bonferroni: share the false alarm rate across all comparisons."""
+    check_level(alpha, "alpha")
+    if int(comparisons) != comparisons or comparisons < 1:
+        raise ValueError("comparisons must be a whole number, 1 or more")
+    return alpha / comparisons
+
+
 def examples_to_compare(
     baseline: float,
     improvement: float,
@@ -68,6 +76,7 @@ def examples_to_compare(
     disagreement: Optional[float] = None,
     alpha: float = 0.05,
     power: float = 0.8,
+    comparisons: int = 1,
 ) -> int:
     """Questions needed to reliably detect that model B beats model A.
 
@@ -79,16 +88,22 @@ def examples_to_compare(
             answer is the number of questions for each model.
         disagreement: share of questions where exactly one model is right.
             Only used when paired.
-        alpha: false alarm rate (two-sided).
+        alpha: false alarm rate (two-sided), for all comparisons together.
         power: chance of detecting the improvement if it is real.
+        comparisons: how many comparisons the eval will make, for example 4
+            when testing 4 new prompts against the current one. The false
+            alarm rate is shared across them (Bonferroni), so more
+            comparisons need more questions.
 
     Paired uses the McNemar sample size formula (Connor, 1987). Unpaired uses
     the standard two-proportion formula.
 
     >>> examples_to_compare(0.70, 0.05, disagreement=0.15)
     469
+    >>> examples_to_compare(0.70, 0.05, disagreement=0.15, comparisons=4)
+    667
     """
-    check_level(alpha, "alpha")
+    alpha = _split_alpha(alpha, comparisons)
     check_level(power, "power")
     target, psi = _setup(baseline, improvement, disagreement)
     d = abs(improvement)
@@ -109,11 +124,12 @@ def power_to_compare(
     paired: bool = True,
     disagreement: Optional[float] = None,
     alpha: float = 0.05,
+    comparisons: int = 1,
 ) -> float:
     """Chance that an eval with ``n`` questions detects the improvement."""
     if n <= 0:
         raise ValueError("n must be positive")
-    check_level(alpha, "alpha")
+    alpha = _split_alpha(alpha, comparisons)
     target, psi = _setup(baseline, improvement, disagreement)
     d = abs(improvement)
     za = z_two_sided(alpha)
@@ -132,6 +148,7 @@ def smallest_detectable_improvement(
     disagreement: Optional[float] = None,
     alpha: float = 0.05,
     power: float = 0.8,
+    comparisons: int = 1,
 ) -> Optional[float]:
     """Smallest gain over ``baseline`` that ``n`` questions can reliably detect.
 
@@ -142,13 +159,16 @@ def smallest_detectable_improvement(
     """
     check_level(power, "power")
     check_rate(baseline, "baseline")
+    _split_alpha(alpha, comparisons)
+    if n <= 0:
+        raise ValueError("n must be positive")
     high = 1 - baseline - 1e-9
     if disagreement is not None and paired:
         high = min(high, disagreement)
 
     def detectable(gain: float) -> bool:
         try:
-            return power_to_compare(n, baseline, gain, paired, disagreement, alpha) >= power
+            return power_to_compare(n, baseline, gain, paired, disagreement, alpha, comparisons) >= power
         except ValueError:
             return False
 

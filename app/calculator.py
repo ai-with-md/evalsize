@@ -20,9 +20,13 @@ async def _(mo):
 
     if sys.platform == "emscripten":
         # In the browser, install the library from the wheel published with this page.
+        # wheel.txt holds the wheel's file name, so a new version needs no change here.
         import micropip
+        from pyodide.http import pyfetch
 
-        await micropip.install(str(mo.notebook_location() / "public" / "evalsize-0.1.0-py3-none-any.whl"))
+        _public = mo.notebook_location() / "public"
+        _wheel = (await (await pyfetch(str(_public / "wheel.txt"))).string()).strip()
+        await micropip.install(str(_public / _wheel))
     import evalsize as es
     import matplotlib.pyplot as plt
 
@@ -55,6 +59,7 @@ def _(mo):
     3. [Is B really better than A?](#diff)
     4. [More questions, or more runs per question?](#reruns)
     5. [Can I trust my LLM judge?](#judge)
+    6. [Testing several prompts at once?](#many)
 
     The same calculations are in the Python library: `pip install evalsize`.
     """)
@@ -341,13 +346,73 @@ def _(es, jd_hf, jd_hp, jd_n, jd_rate, jd_sens, jd_spec, mo):
 
 @app.cell
 def _(mo):
+    mp_k = mo.ui.slider(1, 10, step=1, value=4, label="New prompts to test", show_value=True)
+    mp_baseline = mo.ui.slider(0.30, 0.95, step=0.01, value=0.70, label="Current prompt's pass rate", show_value=True)
+    mp_gain = mo.ui.slider(0.01, 0.20, step=0.01, value=0.05, label="Smallest gain worth detecting", show_value=True)
+    mp_disagree = mo.ui.slider(
+        0.02, 0.60, step=0.01, value=0.15, label="Share of questions where they disagree", show_value=True
+    )
+    return mp_baseline, mp_disagree, mp_gain, mp_k
+
+
+@app.cell
+def _(ACCENT, MUTED, es, mo, mp_baseline, mp_disagree, mp_gain, mp_k, plt):
+    _k, _base, _gain, _psi = mp_k.value, mp_baseline.value, mp_gain.value, mp_disagree.value
+    _header = mo.md(
+        """
+        <h2 id="many">6. Testing several prompts at once?</h2>
+
+        Try five prompts that are all exactly as good as the current one, and there is still a fair
+        chance one of them looks significantly better by luck. Pick it and you ship a change that
+        does nothing. Correcting for the number of comparisons keeps the false alarm rate at 5%
+        across all of them, and needs a few more questions. To analyze results, run
+        `evalsize many results.csv --baseline current`.
+        """
+    )
+    _controls = mo.vstack([mo.hstack([mp_k, mp_baseline], wrap=True), mo.hstack([mp_gain, mp_disagree], wrap=True)])
+    if _base + _gain >= 1:
+        _body = mo.callout(mo.md("The current pass rate plus the gain must stay below 100%."), kind="warn")
+    else:
+        try:
+            _single = es.examples_to_compare(_base, _gain, disagreement=_psi)
+            _many = es.examples_to_compare(_base, _gain, disagreement=_psi, comparisons=_k)
+            _ks = list(range(1, 11))
+            _fig, _ax = plt.subplots()
+            _ax.plot(_ks, [es.examples_to_compare(_base, _gain, disagreement=_psi, comparisons=k) for k in _ks], color=ACCENT, linewidth=2, marker="o")
+            _ax.axhline(_single, color=MUTED, linestyle="--")
+            _ax.text(10, _single, " one prompt", va="bottom", ha="right", color=MUTED, fontsize=8)
+            _ax.set_xlabel("New prompts tested against the current one")
+            _ax.set_ylabel("Questions needed")
+            _fig.tight_layout()
+            _body = mo.vstack(
+                [
+                    mo.hstack(
+                        [
+                            mo.stat(f"{_many:,}", label="Questions needed", caption=f"testing {_k} prompt{'s' if _k > 1 else ''}, corrected", bordered=True),
+                            mo.stat(f"{_single:,}", label="For a single prompt", caption="no correction needed", bordered=True),
+                            mo.stat(f"{es.false_win_chance(_k):.0%}", label="Lucky winner risk", caption="at most, if you skip the correction", bordered=True),
+                        ],
+                        justify="start",
+                        wrap=True,
+                    ),
+                    _fig,
+                ]
+            )
+        except ValueError as _exc:
+            _body = mo.callout(mo.md(str(_exc)), kind="warn")
+    mo.vstack([_header, _controls, _body])
+    return
+
+
+@app.cell
+def _(mo):
     mo.md("""
     ---
     Built with [evalsize](https://github.com/ai-with-md/evalsize), MIT licensed. The methods:
     Wilson intervals, the McNemar sample size formula (Connor, 1987), the exact McNemar test with
-    the Agresti and Min (2005) interval, the intraclass correlation for reruns, and the Rogan and
-    Gladen (1978) correction for imperfect judges. Every formula is checked against simulation in
-    the test suite.
+    the Agresti and Min (2005) interval, the intraclass correlation for reruns, the Rogan and
+    Gladen (1978) correction for imperfect judges, and the Holm and Bonferroni corrections for
+    testing several prompts. Every formula is checked against simulation in the test suite.
     """)
     return
 

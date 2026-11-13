@@ -29,7 +29,9 @@ jobs:
       - name: Install tools
         run: pip install build "marimo==0.25.2" uv
       - name: Build the library wheel for the page
-        run: python -m build --wheel --outdir app/public .
+        run: |
+          python -m build --wheel --outdir app/public .
+          cd app/public && ls *.whl > wheel.txt
       - name: Export the calculator
         run: |
           pip install -e .
