@@ -2,9 +2,12 @@
 
 **How many eval examples do I need?** Sample size and power planning for LLM evals, with a [calculator that runs in your browser](https://ai-with-md.github.io/evalsize/).
 
+[![PyPI](https://img.shields.io/pypi/v/evalsize)](https://pypi.org/project/evalsize/)
 [![tests](https://github.com/ai-with-md/evalsize/actions/workflows/tests.yml/badge.svg)](https://github.com/ai-with-md/evalsize/actions/workflows/tests.yml)
 ![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
+
+[![The evalsize calculator: questions needed to compare two models](https://raw.githubusercontent.com/ai-with-md/evalsize/main/docs/calculator.png)](https://ai-with-md.github.io/evalsize/)
 
 Most teams pick an eval size by feel: 100 questions, maybe 500. Then a new prompt scores 2 points higher and nobody knows whether that is real. evalsize answers the planning questions before you spend the API budget:
 
