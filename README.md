@@ -173,6 +173,13 @@ Formulas are easy to get subtly wrong, so every one is tested against simulation
 
 Everything here is for pass/fail scores, which is how most evals are reported. Planning for scores on a scale (1 to 5, or 0 to 1) is a likely next step.
 
+## More tools
+
+Small, free tools for building and checking AI systems:
+
+- **[sturdytools](https://github.com/ai-with-md/sturdytools)**: retries, timeouts, rate limits and circuit breakers for the tools an AI agent calls.
+- **[costplan](https://github.com/ai-with-md/costplan)**: what an AI agent will cost and what budget cap to set, from a handful of pilot runs.
+
 ## Development
 
 ```bash
