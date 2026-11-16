@@ -177,6 +177,7 @@ Everything here is for pass/fail scores, which is how most evals are reported. P
 
 Small, free tools for building and checking AI systems:
 
+- **[evalnoise](https://github.com/ai-with-md/evalnoise)**: where the noise in an eval score comes from (questions, judges, prompt wordings, reruns), and where to spend the next API calls.
 - **[sturdytools](https://github.com/ai-with-md/sturdytools)**: retries, timeouts, rate limits and circuit breakers for the tools an AI agent calls.
 - **[costplan](https://github.com/ai-with-md/costplan)**: what an AI agent will cost and what budget cap to set, from a handful of pilot runs.
 
